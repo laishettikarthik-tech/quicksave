@@ -27,6 +27,7 @@ quicksave restore 3 src/app.py # only pull back one file or directory
 quicksave restore 3 --clean    # exact rewind: also delete files added after the snapshot
 quicksave status               # what changed in the tree since the last snapshot
 quicksave diff 2 3             # see what changed between two snapshots
+quicksave gc --keep 10         # drop old snapshots and blobs nothing points at
 ```
 
 Typical flow with an agent:

@@ -183,6 +183,58 @@ def status(root, ref=None, ignore=DEFAULT_IGNORE):
     }
 
 
+def _referenced_blobs(snap_files):
+    refs = set()
+    for f in snap_files:
+        for meta in json.loads(f.read_text())["files"].values():
+            refs.add(meta["sha256"])
+    return refs
+
+
+def _iter_blobs(store):
+    objects = Path(store) / "objects"
+    if not objects.is_dir():
+        return
+    for shard in objects.iterdir():
+        if not shard.is_dir():
+            continue
+        for obj in shard.iterdir():
+            if obj.name.endswith(".tmp"):
+                continue
+            yield obj, shard.name + obj.name
+
+
+def gc(root, keep=None, dry_run=False):
+    store = store_path(root)
+    if not store.is_dir():
+        raise QuicksaveError("not a quicksave project, run 'quicksave init' first")
+
+    snaps = _snapshot_files(store)
+    drop = snaps[: len(snaps) - keep] if keep is not None and keep < len(snaps) else []
+    survivors = [f for f in snaps if f not in drop]
+
+    pruned = []
+    for f in drop:
+        pruned.append(f.stem)
+        if not dry_run:
+            f.unlink()
+
+    refs = _referenced_blobs(survivors)
+    removed = 0
+    for obj, digest in list(_iter_blobs(store)):
+        if digest in refs:
+            continue
+        removed += 1
+        if not dry_run:
+            obj.unlink()
+            shard = obj.parent
+            try:
+                shard.rmdir()
+            except OSError:
+                pass
+    return {"pruned": pruned, "blobs": removed, "dry_run": dry_run}
+
+
 def _path_selected(relpath, paths):
     for p in paths:
         if relpath == p or relpath.startswith(p.rstrip("/") + "/"):

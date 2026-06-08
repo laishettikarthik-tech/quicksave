@@ -93,6 +93,22 @@ def cmd_diff(args):
     )
 
 
+def cmd_gc(args):
+    root = _root_or_die()
+    r = store.gc(root, keep=args.keep, dry_run=args.dry_run)
+    tag = " [dim](dry run)[/]" if r["dry_run"] else ""
+    if r["pruned"]:
+        for name in r["pruned"]:
+            console.print(f"[red]- snapshot {name}[/]")
+    if not r["pruned"] and not r["blobs"]:
+        console.print(f"[green]nothing to collect[/]{tag}")
+        return
+    console.print(
+        f"removed [cyan]{len(r['pruned'])}[/] snapshots, "
+        f"[cyan]{r['blobs']}[/] unreferenced blobs{tag}"
+    )
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="quicksave", description="F5 for your filesystem")
     p.add_argument("--version", action="version", version=f"quicksave {__version__}")
@@ -124,6 +140,13 @@ def build_parser():
     pd.add_argument("a", help="snapshot id or number")
     pd.add_argument("b", help="snapshot id or number")
     pd.set_defaults(func=cmd_diff)
+
+    pg = sub.add_parser("gc", help="drop old snapshots and unreferenced blobs")
+    pg.add_argument("--keep", type=int, default=None,
+                    help="keep only the N most recent snapshots")
+    pg.add_argument("--dry-run", action="store_true",
+                    help="show what would be removed without deleting")
+    pg.set_defaults(func=cmd_gc)
 
     return p
 

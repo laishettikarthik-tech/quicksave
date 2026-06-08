@@ -234,3 +234,39 @@ def test_restore_clean_scoped_to_paths(tmp_path):
     assert removed == 1
     assert not (tmp_path / "src" / "extra.py").exists()
     assert (tmp_path / "other.txt").read_text() == "leave me"
+
+
+def test_gc_prunes_old_snapshots_and_blobs(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "f.txt").write_text("one")
+    store.save(tmp_path, message="s0")
+    (tmp_path / "f.txt").write_text("two")
+    store.save(tmp_path, message="s1")
+    (tmp_path / "f.txt").write_text("three")
+    store.save(tmp_path, message="s2")
+
+    objects = tmp_path / ".quicksave" / "objects"
+    before = sum(1 for _ in store._iter_blobs(objects.parent))
+    assert before == 3
+
+    r = store.gc(tmp_path, keep=1)
+    assert len(r["pruned"]) == 2
+    assert r["blobs"] == 2
+    snaps = store.list_snapshots(tmp_path)
+    assert len(snaps) == 1
+    assert snaps[0]["message"] == "s2"
+    after = sum(1 for _ in store._iter_blobs(tmp_path / ".quicksave"))
+    assert after == 1
+
+
+def test_gc_dry_run_keeps_everything(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "f.txt").write_text("a")
+    store.save(tmp_path)
+    (tmp_path / "f.txt").write_text("b")
+    store.save(tmp_path)
+
+    r = store.gc(tmp_path, keep=1, dry_run=True)
+    assert len(r["pruned"]) == 1
+    assert r["blobs"] == 1
+    assert len(store.list_snapshots(tmp_path)) == 2
