@@ -1,0 +1,23 @@
+[project]
+name = "quicksave"
+version = "0.1.0"
+description = "F5 for your filesystem: checkpoint before every agent command, restore even after rm -rf"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = ["rich>=13.0"]
+keywords = ["snapshot", "checkpoint", "undo", "agent", "filesystem", "backup"]
+
+[project.scripts]
+quicksave = "quicksave.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/qorexdevs/quicksave"
+Issues = "https://github.com/qorexdevs/quicksave/issues"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["quicksave"]
