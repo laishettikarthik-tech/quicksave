@@ -134,6 +134,23 @@ def _find_snapshot(store, ref):
     return None
 
 
+def diff(root, ref_a, ref_b):
+    store = store_path(root)
+    fa = _find_snapshot(store, ref_a)
+    if fa is None:
+        raise QuicksaveError(f"snapshot '{ref_a}' not found")
+    fb = _find_snapshot(store, ref_b)
+    if fb is None:
+        raise QuicksaveError(f"snapshot '{ref_b}' not found")
+
+    a = json.loads(fa.read_text())["files"]
+    b = json.loads(fb.read_text())["files"]
+    added = sorted(set(b) - set(a))
+    removed = sorted(set(a) - set(b))
+    modified = sorted(p for p in set(a) & set(b) if a[p]["sha256"] != b[p]["sha256"])
+    return {"added": added, "removed": removed, "modified": modified}
+
+
 def restore(root, ref):
     root = Path(root)
     store = store_path(root)

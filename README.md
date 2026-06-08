@@ -23,6 +23,7 @@ quicksave save -m "before refactor"
 quicksave list
 quicksave restore 3            # restore by number from the list
 quicksave restore a1b2c3       # or by id
+quicksave diff 2 3             # see what changed between two snapshots
 ```
 
 Typical flow with an agent:

@@ -89,3 +89,37 @@ def test_restore_missing_ref(tmp_path):
     store.init(tmp_path)
     with pytest.raises(store.QuicksaveError):
         store.restore(tmp_path, "nope")
+
+
+def test_diff_between_snapshots(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "keep.txt").write_text("same")
+    (tmp_path / "gone.txt").write_text("bye")
+    (tmp_path / "edit.txt").write_text("v1")
+    store.save(tmp_path)
+
+    os.remove(tmp_path / "gone.txt")
+    (tmp_path / "edit.txt").write_text("v2")
+    (tmp_path / "new.txt").write_text("hi")
+    store.save(tmp_path)
+
+    d = store.diff(tmp_path, "0", "1")
+    assert d["added"] == ["new.txt"]
+    assert d["removed"] == ["gone.txt"]
+    assert d["modified"] == ["edit.txt"]
+
+
+def test_diff_identical_is_empty(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    store.save(tmp_path)
+    store.save(tmp_path)
+    d = store.diff(tmp_path, "0", "1")
+    assert d == {"added": [], "removed": [], "modified": []}
+
+
+def test_diff_missing_ref(tmp_path):
+    store.init(tmp_path)
+    store.save(tmp_path)
+    with pytest.raises(store.QuicksaveError):
+        store.diff(tmp_path, "0", "nope")

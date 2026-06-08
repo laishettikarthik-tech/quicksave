@@ -58,6 +58,24 @@ def cmd_restore(args):
     console.print(f"restored [cyan]{n}[/] files from [cyan]{args.ref}[/] [dim]{when}[/]")
 
 
+def cmd_diff(args):
+    root = _root_or_die()
+    d = store.diff(root, args.a, args.b)
+    if not any(d.values()):
+        console.print(f"[dim]no changes between {args.a} and {args.b}[/]")
+        return
+    for path in d["added"]:
+        console.print(f"[green]+ {path}[/]")
+    for path in d["removed"]:
+        console.print(f"[red]- {path}[/]")
+    for path in d["modified"]:
+        console.print(f"[yellow]~ {path}[/]")
+    console.print(
+        f"[dim]{len(d['added'])} added, {len(d['removed'])} removed, "
+        f"{len(d['modified'])} modified[/]"
+    )
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="quicksave", description="F5 for your filesystem")
     p.add_argument("--version", action="version", version=f"quicksave {__version__}")
@@ -77,6 +95,11 @@ def build_parser():
     pr = sub.add_parser("restore", help="restore files from a snapshot")
     pr.add_argument("ref", help="snapshot id or number from 'quicksave list'")
     pr.set_defaults(func=cmd_restore)
+
+    pd = sub.add_parser("diff", help="show what changed between two snapshots")
+    pd.add_argument("a", help="snapshot id or number")
+    pd.add_argument("b", help="snapshot id or number")
+    pd.set_defaults(func=cmd_diff)
 
     return p
 
