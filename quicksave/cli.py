@@ -1,6 +1,5 @@
 import argparse
 from datetime import datetime
-from pathlib import Path
 
 from rich.console import Console
 from rich.table import Table
@@ -53,10 +52,27 @@ def cmd_list(args):
 
 def cmd_restore(args):
     root = _root_or_die()
-    n, manifest = store.restore(root, args.ref, args.paths)
+    n, removed, manifest = store.restore(root, args.ref, args.paths, clean=args.clean)
     when = manifest.get("message") or args.ref
     scope = f" [dim]({', '.join(args.paths)})[/]" if args.paths else ""
-    console.print(f"restored [cyan]{n}[/] files from [cyan]{args.ref}[/] [dim]{when}[/]{scope}")
+    extra = f" [red](removed {removed})[/]" if removed else ""
+    console.print(f"restored [cyan]{n}[/] files from [cyan]{args.ref}[/] [dim]{when}[/]{scope}{extra}")
+
+
+def cmd_status(args):
+    root = _root_or_die()
+    s = store.status(root, args.ref)
+    label = f"#{s['seq']} {s['id']}"
+    if not (s["added"] or s["removed"] or s["modified"]):
+        console.print(f"[green]clean[/] [dim]working tree matches snapshot {label}[/]")
+        return
+    console.print(f"[dim]changes since snapshot {label}:[/]")
+    for path in s["added"]:
+        console.print(f"[green]+ {path}[/]")
+    for path in s["removed"]:
+        console.print(f"[red]- {path}[/]")
+    for path in s["modified"]:
+        console.print(f"[yellow]~ {path}[/]")
 
 
 def cmd_diff(args):
@@ -96,7 +112,13 @@ def build_parser():
     pr = sub.add_parser("restore", help="restore files from a snapshot")
     pr.add_argument("ref", help="snapshot id or number from 'quicksave list'")
     pr.add_argument("paths", nargs="*", help="only restore these files or directories")
+    pr.add_argument("--clean", action="store_true",
+                    help="delete files not in the snapshot (exact rewind)")
     pr.set_defaults(func=cmd_restore)
+
+    pt = sub.add_parser("status", help="show changes since a snapshot (default latest)")
+    pt.add_argument("ref", nargs="?", default=None, help="snapshot id or number, defaults to latest")
+    pt.set_defaults(func=cmd_status)
 
     pd = sub.add_parser("diff", help="show what changed between two snapshots")
     pd.add_argument("a", help="snapshot id or number")

@@ -125,11 +125,16 @@ def list_snapshots(root):
 
 def _find_snapshot(store, ref):
     ref = str(ref)
-    for f in _snapshot_files(store):
-        seq, _, snap_id = f.stem.partition("-")
-        if f.stem == ref or snap_id.startswith(ref):
+    files = _snapshot_files(store)
+    # a bare number is a sequence from 'list'; resolve it before any id-prefix
+    # match so an id that happens to start with that digit can't shadow it
+    for f in files:
+        seq, _, _ = f.stem.partition("-")
+        if f.stem == ref or (ref.isdigit() and int(seq) == int(ref)):
             return f
-        if ref.isdigit() and int(seq) == int(ref):
+    for f in files:
+        _, _, snap_id = f.stem.partition("-")
+        if snap_id.startswith(ref):
             return f
     return None
 
@@ -151,6 +156,33 @@ def diff(root, ref_a, ref_b):
     return {"added": added, "removed": removed, "modified": modified}
 
 
+def status(root, ref=None, ignore=DEFAULT_IGNORE):
+    store = store_path(root)
+    snaps = _snapshot_files(store)
+    if not snaps:
+        raise QuicksaveError("no snapshots yet, run 'quicksave save' first")
+    f = snaps[-1] if ref is None else _find_snapshot(store, ref)
+    if f is None:
+        raise QuicksaveError(f"snapshot '{ref}' not found")
+
+    snap = {p: m["sha256"] for p, m in json.loads(f.read_text())["files"].items()}
+    cur = {}
+    for rel in iter_files(root, ignore):
+        try:
+            cur[rel.as_posix()] = _sha256((Path(root) / rel).read_bytes())
+        except OSError:
+            continue
+
+    seq, _, snap_id = f.stem.partition("-")
+    return {
+        "seq": int(seq),
+        "id": snap_id,
+        "added": sorted(set(cur) - set(snap)),
+        "removed": sorted(set(snap) - set(cur)),
+        "modified": sorted(p for p in set(cur) & set(snap) if cur[p] != snap[p]),
+    }
+
+
 def _path_selected(relpath, paths):
     for p in paths:
         if relpath == p or relpath.startswith(p.rstrip("/") + "/"):
@@ -158,7 +190,7 @@ def _path_selected(relpath, paths):
     return False
 
 
-def restore(root, ref, paths=None):
+def restore(root, ref, paths=None, clean=False, ignore=DEFAULT_IGNORE):
     root = Path(root)
     store = store_path(root)
     f = _find_snapshot(store, ref)
@@ -167,8 +199,8 @@ def restore(root, ref, paths=None):
 
     manifest = json.loads(f.read_text())
     files = manifest["files"]
-    if paths:
-        wanted = [Path(p).as_posix() for p in paths]
+    wanted = [Path(p).as_posix() for p in paths] if paths else None
+    if wanted:
         files = {rel: meta for rel, meta in files.items() if _path_selected(rel, wanted)}
         if not files:
             raise QuicksaveError(f"no files matching {', '.join(paths)} in snapshot '{ref}'")
@@ -187,4 +219,19 @@ def restore(root, ref, paths=None):
         except OSError:
             pass
         restored += 1
-    return restored, manifest
+
+    removed = 0
+    if clean:
+        keep = set(files)
+        for rel in iter_files(root, ignore):
+            relp = rel.as_posix()
+            if relp in keep:
+                continue
+            if wanted and not _path_selected(relp, wanted):
+                continue
+            try:
+                (root / relp).unlink()
+                removed += 1
+            except OSError:
+                pass
+    return restored, removed, manifest

@@ -68,7 +68,7 @@ def test_restore_after_delete(tmp_path):
     os.remove(tmp_path / "data" / "x.txt")
     assert not (tmp_path / "code.py").exists()
 
-    n, _ = store.restore(tmp_path, snap_id)
+    n, _, _ = store.restore(tmp_path, snap_id)
     assert n == 2
     assert (tmp_path / "code.py").read_text() == "print('keep me')"
     assert (tmp_path / "data" / "x.txt").read_text() == "payload"
@@ -82,7 +82,7 @@ def test_restore_single_file(tmp_path):
     os.remove(tmp_path / "a.txt")
     os.remove(tmp_path / "b.txt")
 
-    n, _ = store.restore(tmp_path, snap_id, ["a.txt"])
+    n, _, _ = store.restore(tmp_path, snap_id, ["a.txt"])
     assert n == 1
     assert (tmp_path / "a.txt").read_text() == "aaa"
     assert not (tmp_path / "b.txt").exists()
@@ -99,7 +99,7 @@ def test_restore_directory_prefix(tmp_path):
     os.remove(tmp_path / "src" / "y.py")
     os.remove(tmp_path / "top.txt")
 
-    n, _ = store.restore(tmp_path, snap_id, ["src"])
+    n, _, _ = store.restore(tmp_path, snap_id, ["src"])
     assert n == 2
     assert (tmp_path / "src" / "x.py").read_text() == "x"
     assert not (tmp_path / "top.txt").exists()
@@ -162,3 +162,75 @@ def test_diff_missing_ref(tmp_path):
     store.save(tmp_path)
     with pytest.raises(store.QuicksaveError):
         store.diff(tmp_path, "0", "nope")
+
+
+def test_find_snapshot_number_beats_id_prefix(tmp_path):
+    # snapshot 0's id starts with "1"; resolving ref "1" must hit seq 1, not it
+    store.init(tmp_path)
+    snaps = tmp_path / ".quicksave" / "snapshots"
+    snaps.joinpath("0000-1aaaaaaaaaaa.json").write_text('{"files": {"old": 1}}')
+    snaps.joinpath("0001-bbbbbbbbbbbb.json").write_text('{"files": {"new": 1}}')
+    f = store._find_snapshot(store.store_path(tmp_path), "1")
+    assert f.stem == "0001-bbbbbbbbbbbb"
+
+
+def test_status_against_latest(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "keep.txt").write_text("same")
+    (tmp_path / "gone.txt").write_text("bye")
+    (tmp_path / "edit.txt").write_text("v1")
+    store.save(tmp_path)
+
+    os.remove(tmp_path / "gone.txt")
+    (tmp_path / "edit.txt").write_text("v2")
+    (tmp_path / "new.txt").write_text("hi")
+
+    s = store.status(tmp_path)
+    assert s["added"] == ["new.txt"]
+    assert s["removed"] == ["gone.txt"]
+    assert s["modified"] == ["edit.txt"]
+
+
+def test_status_clean_tree(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    store.save(tmp_path)
+    s = store.status(tmp_path)
+    assert s == {"seq": 0, "id": s["id"], "added": [], "removed": [], "modified": []}
+
+
+def test_status_no_snapshots_raises(tmp_path):
+    store.init(tmp_path)
+    with pytest.raises(store.QuicksaveError):
+        store.status(tmp_path)
+
+
+def test_restore_clean_removes_new_files(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "code.py").write_text("v1")
+    snap_id, _ = store.save(tmp_path)
+
+    (tmp_path / "code.py").write_text("garbage from agent")
+    (tmp_path / "junk.log").write_text("noise")
+
+    restored, removed, _ = store.restore(tmp_path, snap_id, clean=True)
+    assert restored == 1
+    assert removed == 1
+    assert (tmp_path / "code.py").read_text() == "v1"
+    assert not (tmp_path / "junk.log").exists()
+
+
+def test_restore_clean_scoped_to_paths(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "a.py").write_text("a")
+    (tmp_path / "top.txt").write_text("t")
+    snap_id, _ = store.save(tmp_path)
+
+    (tmp_path / "src" / "extra.py").write_text("junk")
+    (tmp_path / "other.txt").write_text("leave me")
+
+    _, removed, _ = store.restore(tmp_path, snap_id, ["src"], clean=True)
+    assert removed == 1
+    assert not (tmp_path / "src" / "extra.py").exists()
+    assert (tmp_path / "other.txt").read_text() == "leave me"
