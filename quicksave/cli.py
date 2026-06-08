@@ -53,9 +53,10 @@ def cmd_list(args):
 
 def cmd_restore(args):
     root = _root_or_die()
-    n, manifest = store.restore(root, args.ref)
+    n, manifest = store.restore(root, args.ref, args.paths)
     when = manifest.get("message") or args.ref
-    console.print(f"restored [cyan]{n}[/] files from [cyan]{args.ref}[/] [dim]{when}[/]")
+    scope = f" [dim]({', '.join(args.paths)})[/]" if args.paths else ""
+    console.print(f"restored [cyan]{n}[/] files from [cyan]{args.ref}[/] [dim]{when}[/]{scope}")
 
 
 def cmd_diff(args):
@@ -94,6 +95,7 @@ def build_parser():
 
     pr = sub.add_parser("restore", help="restore files from a snapshot")
     pr.add_argument("ref", help="snapshot id or number from 'quicksave list'")
+    pr.add_argument("paths", nargs="*", help="only restore these files or directories")
     pr.set_defaults(func=cmd_restore)
 
     pd = sub.add_parser("diff", help="show what changed between two snapshots")

@@ -23,6 +23,7 @@ quicksave save -m "before refactor"
 quicksave list
 quicksave restore 3            # restore by number from the list
 quicksave restore a1b2c3       # or by id
+quicksave restore 3 src/app.py # only pull back one file or directory
 quicksave diff 2 3             # see what changed between two snapshots
 ```
 
@@ -36,7 +37,8 @@ quicksave restore 0            # roll back if it broke something
 ```
 
 `restore` brings back every file that was in the snapshot, so deleting a directory and restoring
-gets it back. It is additive: it won't touch new files you created after the snapshot.
+gets it back. Pass one or more paths to only restore those (a directory name matches everything
+under it). It is additive: it won't touch new files you created after the snapshot.
 
 ## How it works
 

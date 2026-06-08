@@ -151,7 +151,14 @@ def diff(root, ref_a, ref_b):
     return {"added": added, "removed": removed, "modified": modified}
 
 
-def restore(root, ref):
+def _path_selected(relpath, paths):
+    for p in paths:
+        if relpath == p or relpath.startswith(p.rstrip("/") + "/"):
+            return True
+    return False
+
+
+def restore(root, ref, paths=None):
     root = Path(root)
     store = store_path(root)
     f = _find_snapshot(store, ref)
@@ -159,8 +166,15 @@ def restore(root, ref):
         raise QuicksaveError(f"snapshot '{ref}' not found")
 
     manifest = json.loads(f.read_text())
+    files = manifest["files"]
+    if paths:
+        wanted = [Path(p).as_posix() for p in paths]
+        files = {rel: meta for rel, meta in files.items() if _path_selected(rel, wanted)}
+        if not files:
+            raise QuicksaveError(f"no files matching {', '.join(paths)} in snapshot '{ref}'")
+
     restored = 0
-    for relpath, meta in manifest["files"].items():
+    for relpath, meta in files.items():
         digest = meta["sha256"]
         obj = store / "objects" / digest[:2] / digest[2:]
         if not obj.exists():

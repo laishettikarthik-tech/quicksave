@@ -74,6 +74,45 @@ def test_restore_after_delete(tmp_path):
     assert (tmp_path / "data" / "x.txt").read_text() == "payload"
 
 
+def test_restore_single_file(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("aaa")
+    (tmp_path / "b.txt").write_text("bbb")
+    snap_id, _ = store.save(tmp_path)
+    os.remove(tmp_path / "a.txt")
+    os.remove(tmp_path / "b.txt")
+
+    n, _ = store.restore(tmp_path, snap_id, ["a.txt"])
+    assert n == 1
+    assert (tmp_path / "a.txt").read_text() == "aaa"
+    assert not (tmp_path / "b.txt").exists()
+
+
+def test_restore_directory_prefix(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "x.py").write_text("x")
+    (tmp_path / "src" / "y.py").write_text("y")
+    (tmp_path / "top.txt").write_text("t")
+    snap_id, _ = store.save(tmp_path)
+    os.remove(tmp_path / "src" / "x.py")
+    os.remove(tmp_path / "src" / "y.py")
+    os.remove(tmp_path / "top.txt")
+
+    n, _ = store.restore(tmp_path, snap_id, ["src"])
+    assert n == 2
+    assert (tmp_path / "src" / "x.py").read_text() == "x"
+    assert not (tmp_path / "top.txt").exists()
+
+
+def test_restore_no_match_raises(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("a")
+    store.save(tmp_path)
+    with pytest.raises(store.QuicksaveError):
+        store.restore(tmp_path, "0", ["nope.txt"])
+
+
 def test_restore_by_number(tmp_path):
     store.init(tmp_path)
     (tmp_path / "f.txt").write_text("v1")
