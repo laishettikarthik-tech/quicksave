@@ -1,5 +1,7 @@
 # quicksave
 
+[![ci](https://github.com/qorexdevs/quicksave/actions/workflows/ci.yml/badge.svg)](https://github.com/qorexdevs/quicksave/actions/workflows/ci.yml)
+
 F5 for your filesystem. Checkpoint before every risky command, restore even after `rm -rf`.
 
 Coding agents run shell commands you didn't read. Most undo tools only track git or the editor's
