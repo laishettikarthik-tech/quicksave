@@ -90,7 +90,9 @@ other runner with a pre-command hook can call `quicksave hook` the same way as l
 command on stdin as `{"tool_input": {"command": "..."}}`.
 
 The hook reads the tool payload on stdin, so each save lands as `pre: <command>` in `quicksave
-list`. Run `quicksave init` once in the project first.
+list`. Run `quicksave init` once in the project first. If the tree hasn't changed since the last
+snapshot the save is skipped, so firing the hook on every command doesn't pile up identical
+checkpoints (use `quicksave save --force` if you want one anyway).
 
 ## How it works
 

@@ -49,6 +49,21 @@ def test_hook_saves_before_risky_command(tmp_path, monkeypatch):
     assert "pre: rm -rf data.txt" in snaps[0].read_text()
 
 
+def test_hook_does_not_pile_up_dups(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "data.txt").write_text("keep")
+    main(["init"])
+
+    payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": "rm -rf nope.txt"}})
+    for _ in range(3):
+        monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+        main(["hook"])
+
+    # tree never changed, so the second and third firings reuse the first snapshot
+    snaps = list((tmp_path / ".quicksave" / "snapshots").glob("*.json"))
+    assert len(snaps) == 1
+
+
 def test_hook_skips_safe_command(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     main(["init"])

@@ -29,7 +29,10 @@ def cmd_init(args):
 
 def cmd_save(args):
     root = _root_or_die()
-    snap_id, n = store.save(root, message=args.message or "")
+    snap_id, n, created = store.save(root, message=args.message or "", force=args.force)
+    if not created:
+        console.print(f"[dim]nothing changed since {snap_id}, skipped[/]")
+        return
     msg = f" [dim]{args.message}[/]" if args.message else ""
     console.print(f"saved [cyan]{snap_id}[/] [dim]({n} files)[/]{msg}")
 
@@ -132,8 +135,9 @@ def cmd_hook(args):
     if root is None:
         return
     short = cmd.strip().splitlines()[0][:60]
-    snap_id, n = store.save(root, message=f"pre: {short}")
-    print(f"quicksave {snap_id} ({n} files) before: {short}", file=sys.stderr)
+    snap_id, n, created = store.save(root, message=f"pre: {short}")
+    if created:
+        print(f"quicksave {snap_id} ({n} files) before: {short}", file=sys.stderr)
 
 
 def cmd_hook_install(args):
@@ -157,6 +161,8 @@ def build_parser():
 
     ps = sub.add_parser("save", help="snapshot the working tree")
     ps.add_argument("-m", "--message", default="")
+    ps.add_argument("-f", "--force", action="store_true",
+                    help="snapshot even if nothing changed since the last one")
     ps.set_defaults(func=cmd_save)
 
     pl = sub.add_parser("list", help="list snapshots")

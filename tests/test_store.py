@@ -37,7 +37,8 @@ def test_save_and_list(tmp_path):
     (tmp_path / "sub").mkdir()
     (tmp_path / "sub" / "b.txt").write_text("world")
 
-    snap_id, n = store.save(tmp_path, message="first")
+    snap_id, n, created = store.save(tmp_path, message="first")
+    assert created is True
     assert n == 2
     snaps = store.list_snapshots(tmp_path)
     assert len(snaps) == 1
@@ -53,7 +54,7 @@ def test_ignore_rules(tmp_path):
         d = tmp_path / junk
         d.mkdir()
         (d / "trash").write_text("nope")
-    _, n = store.save(tmp_path)
+    _, n, _ = store.save(tmp_path)
     assert n == 1
 
 
@@ -64,7 +65,7 @@ def test_quicksaveignore_patterns(tmp_path):
     (tmp_path / "logs").mkdir()
     (tmp_path / "logs" / "run.txt").write_text("nope")
     (tmp_path / ".quicksaveignore").write_text("*.log\nlogs/\n")
-    _, n = store.save(tmp_path)
+    _, n, _ = store.save(tmp_path)
     # keep.txt and .quicksaveignore itself remain
     assert n == 2
 
@@ -95,7 +96,7 @@ def test_restore_after_delete(tmp_path):
     (tmp_path / "code.py").write_text("print('keep me')")
     (tmp_path / "data").mkdir()
     (tmp_path / "data" / "x.txt").write_text("payload")
-    snap_id, _ = store.save(tmp_path, message="before rm")
+    snap_id, _, _ = store.save(tmp_path, message="before rm")
 
     # simulate an agent nuking the tree
     os.remove(tmp_path / "code.py")
@@ -112,7 +113,7 @@ def test_restore_single_file(tmp_path):
     store.init(tmp_path)
     (tmp_path / "a.txt").write_text("aaa")
     (tmp_path / "b.txt").write_text("bbb")
-    snap_id, _ = store.save(tmp_path)
+    snap_id, _, _ = store.save(tmp_path)
     os.remove(tmp_path / "a.txt")
     os.remove(tmp_path / "b.txt")
 
@@ -128,7 +129,7 @@ def test_restore_directory_prefix(tmp_path):
     (tmp_path / "src" / "x.py").write_text("x")
     (tmp_path / "src" / "y.py").write_text("y")
     (tmp_path / "top.txt").write_text("t")
-    snap_id, _ = store.save(tmp_path)
+    snap_id, _, _ = store.save(tmp_path)
     os.remove(tmp_path / "src" / "x.py")
     os.remove(tmp_path / "src" / "y.py")
     os.remove(tmp_path / "top.txt")
@@ -204,9 +205,40 @@ def test_diff_identical_is_empty(tmp_path):
     store.init(tmp_path)
     (tmp_path / "a.txt").write_text("x")
     store.save(tmp_path)
-    store.save(tmp_path)
+    store.save(tmp_path, force=True)
     d = store.diff(tmp_path, "0", "1")
     assert d == {"added": [], "removed": [], "modified": []}
+
+
+def test_save_skips_when_unchanged(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    id0, _, created0 = store.save(tmp_path)
+    assert created0 is True
+    id1, _, created1 = store.save(tmp_path)
+    assert created1 is False
+    assert id1 == id0
+    assert len(store.list_snapshots(tmp_path)) == 1
+
+
+def test_save_force_keeps_unchanged_dup(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    store.save(tmp_path)
+    _, _, created = store.save(tmp_path, force=True)
+    assert created is True
+    assert len(store.list_snapshots(tmp_path)) == 2
+
+
+def test_save_resumes_after_change(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    store.save(tmp_path)
+    store.save(tmp_path)  # skipped
+    (tmp_path / "a.txt").write_text("y")
+    _, _, created = store.save(tmp_path)
+    assert created is True
+    assert len(store.list_snapshots(tmp_path)) == 2
 
 
 def test_diff_missing_ref(tmp_path):
@@ -260,7 +292,7 @@ def test_status_no_snapshots_raises(tmp_path):
 def test_restore_clean_removes_new_files(tmp_path):
     store.init(tmp_path)
     (tmp_path / "code.py").write_text("v1")
-    snap_id, _ = store.save(tmp_path)
+    snap_id, _, _ = store.save(tmp_path)
 
     (tmp_path / "code.py").write_text("garbage from agent")
     (tmp_path / "junk.log").write_text("noise")
@@ -277,7 +309,7 @@ def test_restore_clean_scoped_to_paths(tmp_path):
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "a.py").write_text("a")
     (tmp_path / "top.txt").write_text("t")
-    snap_id, _ = store.save(tmp_path)
+    snap_id, _, _ = store.save(tmp_path)
 
     (tmp_path / "src" / "extra.py").write_text("junk")
     (tmp_path / "other.txt").write_text("leave me")

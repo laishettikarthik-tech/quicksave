@@ -127,7 +127,7 @@ def _snapshot_files(store):
     return sorted(d.glob("*.json"))
 
 
-def save(root, message="", ignore=DEFAULT_IGNORE):
+def save(root, message="", ignore=DEFAULT_IGNORE, force=False):
     root = Path(root)
     store = store_path(root)
     if not store.is_dir():
@@ -147,13 +147,19 @@ def save(root, message="", ignore=DEFAULT_IGNORE):
             "mode": full.stat().st_mode & 0o777,
         }
 
+    # nothing changed since the last snapshot: skip the dup so the hook firing on
+    # every command doesn't pile up identical manifests. blobs already existed.
+    snaps = _snapshot_files(store)
+    if snaps and not force and json.loads(snaps[-1].read_text())["files"] == files:
+        _, _, snap_id = snaps[-1].stem.partition("-")
+        return snap_id, len(files), False
+
     manifest = {"message": message, "created_at": time.time(), "files": files}
     body = json.dumps(manifest, sort_keys=True).encode()
     snap_id = _sha256(body)[:12]
-    seq = len(_snapshot_files(store))
-    name = f"{seq:04d}-{snap_id}.json"
+    name = f"{len(snaps):04d}-{snap_id}.json"
     (store / "snapshots" / name).write_text(json.dumps(manifest, indent=2))
-    return snap_id, len(files)
+    return snap_id, len(files), True
 
 
 def list_snapshots(root):
