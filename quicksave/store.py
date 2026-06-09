@@ -176,15 +176,29 @@ def list_snapshots(root):
     for f in _snapshot_files(store):
         seq, _, snap_id = f.stem.partition("-")
         m = json.loads(f.read_text())
+        files = m.get("files", {})
         out.append({
             "seq": int(seq),
             "id": snap_id,
             "name": m.get("name", ""),
             "message": m.get("message", ""),
             "created_at": m.get("created_at", 0),
-            "count": len(m.get("files", {})),
+            "count": len(files),
+            "size": sum(meta.get("size", 0) for meta in files.values()),
         })
     return out
+
+
+def store_size(root):
+    # bytes on disk in the object store: dedup means this is usually far less
+    # than the sum of snapshot sizes, since unchanged files share one blob
+    total = 0
+    for obj, _ in _iter_blobs(store_path(root)):
+        try:
+            total += obj.stat().st_size
+        except OSError:
+            continue
+    return total
 
 
 def _find_snapshot(store, ref):

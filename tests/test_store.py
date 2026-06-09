@@ -45,6 +45,19 @@ def test_save_and_list(tmp_path):
     assert snaps[0]["id"] == snap_id
     assert snaps[0]["message"] == "first"
     assert snaps[0]["count"] == 2
+    assert snaps[0]["size"] == len("hello") + len("world")
+    assert store.store_size(tmp_path) == len("hello") + len("world")
+
+
+def test_store_size_dedups_blobs(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("same")
+    (tmp_path / "b.txt").write_text("same")
+    store.save(tmp_path)
+    # two files share one blob: snapshot size counts both, disk counts it once
+    snaps = store.list_snapshots(tmp_path)
+    assert snaps[0]["size"] == 2 * len("same")
+    assert store.store_size(tmp_path) == len("same")
 
 
 def test_ignore_rules(tmp_path):

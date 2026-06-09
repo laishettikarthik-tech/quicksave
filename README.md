@@ -23,7 +23,7 @@ Needs Python 3.10+.
 quicksave init                 # start tracking this directory
 quicksave save -m "before refactor"
 quicksave save -n pre-deploy   # tag the snapshot with a name
-quicksave list
+quicksave list                 # snapshots with file count, size and total store size on disk
 quicksave restore              # roll back to the latest snapshot
 quicksave restore 3            # restore by number from the list
 quicksave restore a1b2c3       # or by id

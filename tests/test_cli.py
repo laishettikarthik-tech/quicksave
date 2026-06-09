@@ -62,6 +62,7 @@ def test_cli_list_json(tmp_path, monkeypatch, capsys):
     assert len(snaps) == 1
     assert snaps[0]["message"] == "wip"
     assert snaps[0]["count"] == 1
+    assert snaps[0]["size"] == len("draft")
 
 
 def test_cli_status_json(tmp_path, monkeypatch, capsys):

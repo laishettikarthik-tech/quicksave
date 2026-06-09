@@ -11,6 +11,13 @@ from . import __version__, store
 console = Console()
 
 
+def _human_size(n):
+    for unit in ("B", "K", "M", "G"):
+        if n < 1024 or unit == "G":
+            return f"{n:.0f}{unit}" if unit == "B" else f"{n:.1f}{unit}"
+        n /= 1024
+
+
 def _root_or_die():
     root = store.find_root()
     if root is None:
@@ -57,12 +64,14 @@ def cmd_list(args):
     table.add_column("name", style="magenta")
     table.add_column("when")
     table.add_column("files", justify="right")
+    table.add_column("size", justify="right")
     table.add_column("message")
     for s in snaps:
         when = datetime.fromtimestamp(s["created_at"]).strftime("%Y-%m-%d %H:%M") if s["created_at"] else "-"
         table.add_row(str(s["seq"]), s["id"], s.get("name") or "[dim]-[/]", when,
-                      str(s["count"]), s["message"] or "[dim]-[/]")
+                      str(s["count"]), _human_size(s.get("size", 0)), s["message"] or "[dim]-[/]")
     console.print(table)
+    console.print(f"[dim]{len(snaps)} snapshots, {_human_size(store.store_size(root))} on disk[/]")
 
 
 def cmd_restore(args):
