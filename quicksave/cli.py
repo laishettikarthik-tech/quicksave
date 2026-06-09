@@ -57,12 +57,36 @@ def cmd_list(args):
 
 def cmd_restore(args):
     root = _root_or_die()
+    if args.dry_run:
+        cmd_restore_preview(args, root)
+        return
     n, removed, manifest = store.restore(root, args.ref, args.paths, clean=args.clean)
     ref = args.ref or "latest"
     when = manifest.get("message") or ref
     scope = f" [dim]({', '.join(args.paths)})[/]" if args.paths else ""
     extra = f" [red](removed {removed})[/]" if removed else ""
     console.print(f"restored [cyan]{n}[/] files from [cyan]{ref}[/] [dim]{when}[/]{scope}{extra}")
+
+
+def cmd_restore_preview(args, root):
+    p = store.restore_plan(root, args.ref, args.paths, clean=args.clean)
+    ref = args.ref or "latest"
+    total = len(p["created"]) + len(p["overwritten"])
+    if not total and not p["removed"] and not p["missing"]:
+        console.print(f"[dim]nothing to restore from {ref}[/]")
+        return
+    for path in p["created"]:
+        console.print(f"[green]+ {path}[/]")
+    for path in p["overwritten"]:
+        console.print(f"[yellow]~ {path}[/]")
+    for path in p["removed"]:
+        console.print(f"[red]- {path}[/]")
+    for path in p["missing"]:
+        console.print(f"[red]! {path} (blob missing)[/]")
+    summary = f"would write {total} ({len(p['created'])} new, {len(p['overwritten'])} overwritten)"
+    if p["removed"]:
+        summary += f", remove {len(p['removed'])}"
+    console.print(f"[dim]{summary} - dry run, nothing touched[/]")
 
 
 def cmd_status(args):
@@ -175,6 +199,8 @@ def build_parser():
     pr.add_argument("paths", nargs="*", help="only restore these files or directories")
     pr.add_argument("--clean", action="store_true",
                     help="delete files not in the snapshot (exact rewind)")
+    pr.add_argument("--dry-run", action="store_true",
+                    help="show what restore would change without writing anything")
     pr.set_defaults(func=cmd_restore)
 
     pt = sub.add_parser("status", help="show changes since a snapshot (default latest)")

@@ -338,6 +338,37 @@ def test_restore_clean_scoped_to_paths(tmp_path):
     assert (tmp_path / "other.txt").read_text() == "leave me"
 
 
+def test_restore_plan_reports_changes_without_touching_disk(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "code.py").write_text("v1")
+    (tmp_path / "gone.txt").write_text("gone")
+    snap_id, _, _ = store.save(tmp_path)
+
+    (tmp_path / "code.py").write_text("garbage")
+    os.remove(tmp_path / "gone.txt")
+    (tmp_path / "junk.log").write_text("noise")
+
+    p = store.restore_plan(tmp_path, snap_id, clean=True)
+    assert p["created"] == ["gone.txt"]
+    assert p["overwritten"] == ["code.py"]
+    assert p["removed"] == ["junk.log"]
+    # nothing on disk changed
+    assert (tmp_path / "code.py").read_text() == "garbage"
+    assert (tmp_path / "junk.log").exists()
+
+
+def test_restore_plan_missing_blob(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("a")
+    snap_id, _, _ = store.save(tmp_path)
+    for obj in (tmp_path / ".quicksave" / "objects").rglob("*"):
+        if obj.is_file():
+            obj.unlink()
+
+    p = store.restore_plan(tmp_path, snap_id)
+    assert p["missing"] == ["a.txt"]
+
+
 def test_gc_prunes_old_snapshots_and_blobs(tmp_path):
     store.init(tmp_path)
     (tmp_path / "f.txt").write_text("one")

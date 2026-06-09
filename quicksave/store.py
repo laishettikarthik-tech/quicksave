@@ -373,26 +373,73 @@ def _path_selected(relpath, paths):
     return False
 
 
-def restore(root, ref=None, paths=None, clean=False, ignore=DEFAULT_IGNORE):
-    root = Path(root)
-    store = store_path(root)
+def _resolve_snapshot(store, ref):
     if ref is None:
         snaps = _snapshot_files(store)
         if not snaps:
             raise QuicksaveError("no snapshots yet, run 'quicksave save' first")
-        f = snaps[-1]
-    else:
-        f = _find_snapshot(store, ref)
-        if f is None:
-            raise QuicksaveError(f"snapshot '{ref}' not found")
+        return snaps[-1]
+    f = _find_snapshot(store, ref)
+    if f is None:
+        raise QuicksaveError(f"snapshot '{ref}' not found")
+    return f
 
-    manifest = json.loads(f.read_text())
+
+def _selected_files(manifest, paths, ref):
     files = manifest["files"]
     wanted = [Path(p).as_posix() for p in paths] if paths else None
     if wanted:
         files = {rel: meta for rel, meta in files.items() if _path_selected(rel, wanted)}
         if not files:
             raise QuicksaveError(f"no files matching {', '.join(paths)} in snapshot '{ref}'")
+    return files, wanted
+
+
+def restore_plan(root, ref=None, paths=None, clean=False, ignore=DEFAULT_IGNORE):
+    # what restore would do, without touching disk
+    root = Path(root)
+    store = store_path(root)
+    f = _resolve_snapshot(store, ref)
+    manifest = json.loads(f.read_text())
+    files, wanted = _selected_files(manifest, paths, ref)
+
+    created, overwritten, missing = [], [], []
+    for relpath, meta in files.items():
+        obj = store / "objects" / meta["sha256"][:2] / meta["sha256"][2:]
+        if not obj.exists():
+            missing.append(relpath)
+        elif (root / relpath).exists():
+            overwritten.append(relpath)
+        else:
+            created.append(relpath)
+
+    removed = []
+    if clean:
+        keep = set(files)
+        for rel in iter_files(root, ignore):
+            relp = rel.as_posix()
+            if relp in keep:
+                continue
+            if wanted and not _path_selected(relp, wanted):
+                continue
+            removed.append(relp)
+
+    return {
+        "id": f.stem.partition("-")[2],
+        "message": manifest.get("message", ""),
+        "created": sorted(created),
+        "overwritten": sorted(overwritten),
+        "removed": sorted(removed),
+        "missing": sorted(missing),
+    }
+
+
+def restore(root, ref=None, paths=None, clean=False, ignore=DEFAULT_IGNORE):
+    root = Path(root)
+    store = store_path(root)
+    f = _resolve_snapshot(store, ref)
+    manifest = json.loads(f.read_text())
+    files, wanted = _selected_files(manifest, paths, ref)
 
     restored = 0
     for relpath, meta in files.items():

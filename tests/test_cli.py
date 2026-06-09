@@ -35,6 +35,21 @@ def test_cli_status_and_clean(tmp_path, monkeypatch, capsys):
     assert "clean" in capsys.readouterr().out
 
 
+def test_cli_restore_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.md").write_text("draft")
+    main(["init"])
+    main(["save", "-m", "base"])
+    capsys.readouterr()
+
+    (tmp_path / "note.md").write_text("edited")
+    main(["restore", "0", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "note.md" in out
+    assert "dry run" in out
+    assert (tmp_path / "note.md").read_text() == "edited"
+
+
 def test_hook_saves_before_risky_command(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data.txt").write_text("keep")
