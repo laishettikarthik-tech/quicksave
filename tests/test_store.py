@@ -153,6 +153,24 @@ def test_restore_missing_ref(tmp_path):
         store.restore(tmp_path, "nope")
 
 
+def test_show_returns_blob_bytes(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("v1")
+    store.save(tmp_path)
+    (tmp_path / "a.txt").write_text("v2")
+    store.save(tmp_path)
+    assert store.show(tmp_path, "0", "a.txt") == b"v1"
+    assert store.show(tmp_path, "1", "a.txt") == b"v2"
+
+
+def test_show_missing_file_raises(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    store.save(tmp_path)
+    with pytest.raises(store.QuicksaveError):
+        store.show(tmp_path, "0", "nope.txt")
+
+
 def test_diff_between_snapshots(tmp_path):
     store.init(tmp_path)
     (tmp_path / "keep.txt").write_text("same")

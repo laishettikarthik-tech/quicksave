@@ -93,6 +93,13 @@ def cmd_diff(args):
     )
 
 
+def cmd_show(args):
+    root = _root_or_die()
+    data = store.show(root, args.ref, args.path)
+    with open(1, "wb", closefd=False) as out:
+        out.write(data)
+
+
 def cmd_gc(args):
     root = _root_or_die()
     r = store.gc(root, keep=args.keep, dry_run=args.dry_run)
@@ -140,6 +147,11 @@ def build_parser():
     pd.add_argument("a", help="snapshot id or number")
     pd.add_argument("b", help="snapshot id or number")
     pd.set_defaults(func=cmd_diff)
+
+    ph = sub.add_parser("show", help="print a file's contents from a snapshot to stdout")
+    ph.add_argument("ref", help="snapshot id or number")
+    ph.add_argument("path", help="file to print")
+    ph.set_defaults(func=cmd_show)
 
     pg = sub.add_parser("gc", help="drop old snapshots and unreferenced blobs")
     pg.add_argument("--keep", type=int, default=None,

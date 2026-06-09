@@ -283,6 +283,22 @@ def gc(root, keep=None, dry_run=False):
     return {"pruned": pruned, "blobs": removed, "dry_run": dry_run}
 
 
+def show(root, ref, path):
+    store = store_path(root)
+    f = _find_snapshot(store, ref)
+    if f is None:
+        raise QuicksaveError(f"snapshot '{ref}' not found")
+    files = json.loads(f.read_text())["files"]
+    rel = Path(path).as_posix()
+    meta = files.get(rel)
+    if meta is None:
+        raise QuicksaveError(f"'{path}' not in snapshot '{ref}'")
+    obj = store / "objects" / meta["sha256"][:2] / meta["sha256"][2:]
+    if not obj.exists():
+        raise QuicksaveError(f"missing blob {meta['sha256']} for {rel}")
+    return obj.read_bytes()
+
+
 def _path_selected(relpath, paths):
     for p in paths:
         if relpath == p or relpath.startswith(p.rstrip("/") + "/"):

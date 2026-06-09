@@ -26,6 +26,7 @@ quicksave restore a1b2c3       # or by id
 quicksave restore 3 src/app.py # only pull back one file or directory
 quicksave restore 3 --clean    # exact rewind: also delete files added after the snapshot
 quicksave status               # what changed in the tree since the last snapshot
+quicksave show 3 src/app.py    # print one file from a snapshot without touching disk
 quicksave diff 2 3             # see what changed between two snapshots
 quicksave gc --keep 10         # drop old snapshots and blobs nothing points at
 ```
@@ -48,6 +49,10 @@ the checkpoint byte for byte.
 `status` compares the working tree to a snapshot (the latest one unless you name another) and shows
 what was added, removed or modified since then, so you can see what a checkpoint would pull you back
 to before you run it.
+
+`show` writes one file's contents from a snapshot straight to stdout, so you can grab a single old
+version without overwriting what's on disk: `quicksave show 3 config.py > config.old.py` or pipe it
+into `diff`.
 
 ## How it works
 
