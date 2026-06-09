@@ -2,6 +2,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import time
 from pathlib import Path
 
@@ -297,6 +298,30 @@ def show(root, ref, path):
     if not obj.exists():
         raise QuicksaveError(f"missing blob {meta['sha256']} for {rel}")
     return obj.read_bytes()
+
+
+# commands worth a checkpoint before an agent runs them: deletes, overwrites,
+# in-place edits and history rewrites. not exhaustive, just the usual footguns.
+_RISKY = [
+    r"\brm\b",
+    r"\bmv\b",
+    r"\bdd\b",
+    r"\bshred\b",
+    r"\btruncate\b",
+    r"\bmkfs\.\w+",
+    r"\bsed\b[^|]*\s-i",
+    r"\bgit\s+reset\b",
+    r"\bgit\s+checkout\s+--",
+    r"\bgit\s+clean\b",
+    r"\bgit\s+restore\b",
+    r"\bfind\b.*\s-delete\b",
+    r"(?:^|\s)>(?!>)\s*\S",
+]
+_RISKY_RE = [re.compile(p) for p in _RISKY]
+
+
+def looks_risky(command):
+    return any(r.search(command) for r in _RISKY_RE)
 
 
 def _path_selected(relpath, paths):

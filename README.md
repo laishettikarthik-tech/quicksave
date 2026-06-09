@@ -54,6 +54,32 @@ to before you run it.
 version without overwriting what's on disk: `quicksave show 3 config.py > config.old.py` or pipe it
 into `diff`.
 
+## Auto-save before an agent's risky commands
+
+Claude Code can fire a hook before it runs a tool. Point its `PreToolUse` Bash hook at
+`quicksave hook` and it will checkpoint the tree right before the agent runs anything destructive
+(`rm`, `mv`, `git reset`, `sed -i`, an overwriting `>`, and friends). Safe commands like `ls` or
+`git status` are ignored, and it stays quiet if the directory isn't a quicksave project, so it never
+blocks the agent.
+
+`.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [{ "type": "command", "command": "quicksave hook" }]
+      }
+    ]
+  }
+}
+```
+
+The hook reads the tool payload on stdin, so each save lands as `pre: <command>` in `quicksave
+list`. Run `quicksave init` once in the project first.
+
 ## How it works
 
 - Files are hashed with SHA-256 and stored once under `.quicksave/objects/` (identical content is

@@ -15,6 +15,17 @@ def test_init_creates_layout(tmp_path):
     assert created2 is False
 
 
+def test_looks_risky():
+    risky = ["rm -rf build", "mv a b", "git reset --hard", "sed -i 's/a/b/' f",
+             "echo x > config.yml", "git clean -fd", "find . -name '*.tmp' -delete"]
+    safe = ["ls -la", "git status", "cat file >> log.txt", "grep -r foo .",
+            "python -m pytest", "echo hi"]
+    for c in risky:
+        assert store.looks_risky(c), c
+    for c in safe:
+        assert not store.looks_risky(c), c
+
+
 def test_save_requires_init(tmp_path):
     with pytest.raises(store.QuicksaveError):
         store.save(tmp_path)

@@ -1,4 +1,6 @@
 import argparse
+import json
+import sys
 from datetime import datetime
 
 from rich.console import Console
@@ -116,6 +118,24 @@ def cmd_gc(args):
     )
 
 
+def cmd_hook(args):
+    # reads a Claude Code PreToolUse payload on stdin and snapshots before a
+    # risky bash command. stays quiet and exits 0 so it never blocks the agent.
+    try:
+        payload = json.loads(sys.stdin.read())
+    except ValueError:
+        return
+    cmd = (payload.get("tool_input") or {}).get("command", "")
+    if not cmd or not store.looks_risky(cmd):
+        return
+    root = store.find_root()
+    if root is None:
+        return
+    short = cmd.strip().splitlines()[0][:60]
+    snap_id, n = store.save(root, message=f"pre: {short}")
+    print(f"quicksave {snap_id} ({n} files) before: {short}", file=sys.stderr)
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="quicksave", description="F5 for your filesystem")
     p.add_argument("--version", action="version", version=f"quicksave {__version__}")
@@ -159,6 +179,9 @@ def build_parser():
     pg.add_argument("--dry-run", action="store_true",
                     help="show what would be removed without deleting")
     pg.set_defaults(func=cmd_gc)
+
+    phook = sub.add_parser("hook", help="PreToolUse hook: auto-save before a risky bash command")
+    phook.set_defaults(func=cmd_hook)
 
     return p
 
