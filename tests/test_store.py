@@ -403,3 +403,46 @@ def test_gc_dry_run_keeps_everything(tmp_path):
     assert len(r["pruned"]) == 1
     assert r["blobs"] == 1
     assert len(store.list_snapshots(tmp_path)) == 2
+
+
+def test_save_with_name_and_restore_by_name(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("v1")
+    store.save(tmp_path, name="before-refactor")
+    (tmp_path / "a.txt").write_text("v2")
+    store.save(tmp_path, message="second")
+
+    snaps = store.list_snapshots(tmp_path)
+    assert snaps[0]["name"] == "before-refactor"
+    assert snaps[1]["name"] == ""
+
+    store.restore(tmp_path, "before-refactor")
+    assert (tmp_path / "a.txt").read_text() == "v1"
+
+
+def test_numeric_name_rejected(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    with pytest.raises(store.QuicksaveError):
+        store.save(tmp_path, name="42")
+
+
+def test_name_lands_on_unchanged_snapshot(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("x")
+    store.save(tmp_path)
+    # nothing changed, but the name should still attach to the existing snapshot
+    _, _, created = store.save(tmp_path, name="keep")
+    assert created is False
+    assert store.list_snapshots(tmp_path)[0]["name"] == "keep"
+    assert store._find_snapshot(store.store_path(tmp_path), "keep") is not None
+
+
+def test_reused_name_resolves_to_latest(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "a.txt").write_text("v1")
+    store.save(tmp_path, name="checkpoint")
+    (tmp_path / "a.txt").write_text("v2")
+    store.save(tmp_path, name="checkpoint")
+    f = store._find_snapshot(store.store_path(tmp_path), "checkpoint")
+    assert f.stem.startswith("0001-")

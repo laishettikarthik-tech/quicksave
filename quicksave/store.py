@@ -127,11 +127,13 @@ def _snapshot_files(store):
     return sorted(d.glob("*.json"))
 
 
-def save(root, message="", ignore=DEFAULT_IGNORE, force=False):
+def save(root, message="", ignore=DEFAULT_IGNORE, force=False, name=""):
     root = Path(root)
     store = store_path(root)
     if not store.is_dir():
         raise QuicksaveError("not a quicksave project, run 'quicksave init' first")
+    if name and name.isdigit():
+        raise QuicksaveError("snapshot name can't be all digits, it would clash with list numbers")
 
     files = {}
     for rel in iter_files(root, ignore):
@@ -151,10 +153,16 @@ def save(root, message="", ignore=DEFAULT_IGNORE, force=False):
     # every command doesn't pile up identical manifests. blobs already existed.
     snaps = _snapshot_files(store)
     if snaps and not force and json.loads(snaps[-1].read_text())["files"] == files:
-        _, _, snap_id = snaps[-1].stem.partition("-")
+        last = snaps[-1]
+        m = json.loads(last.read_text())
+        _, _, snap_id = last.stem.partition("-")
+        # nothing to snapshot, but let a name still land on the existing one
+        if name and m.get("name") != name:
+            m["name"] = name
+            last.write_text(json.dumps(m, indent=2))
         return snap_id, len(files), False
 
-    manifest = {"message": message, "created_at": time.time(), "files": files}
+    manifest = {"message": message, "name": name, "created_at": time.time(), "files": files}
     body = json.dumps(manifest, sort_keys=True).encode()
     snap_id = _sha256(body)[:12]
     name = f"{len(snaps):04d}-{snap_id}.json"
@@ -171,6 +179,7 @@ def list_snapshots(root):
         out.append({
             "seq": int(seq),
             "id": snap_id,
+            "name": m.get("name", ""),
             "message": m.get("message", ""),
             "created_at": m.get("created_at", 0),
             "count": len(m.get("files", {})),
@@ -186,6 +195,10 @@ def _find_snapshot(store, ref):
     for f in files:
         seq, _, _ = f.stem.partition("-")
         if f.stem == ref or (ref.isdigit() and int(seq) == int(ref)):
+            return f
+    # exact snapshot name, latest one wins if a name was reused
+    for f in reversed(files):
+        if json.loads(f.read_text()).get("name") == ref:
             return f
     for f in files:
         _, _, snap_id = f.stem.partition("-")

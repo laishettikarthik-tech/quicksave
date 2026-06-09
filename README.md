@@ -22,10 +22,12 @@ Needs Python 3.10+.
 ```
 quicksave init                 # start tracking this directory
 quicksave save -m "before refactor"
+quicksave save -n pre-deploy   # tag the snapshot with a name
 quicksave list
 quicksave restore              # roll back to the latest snapshot
 quicksave restore 3            # restore by number from the list
 quicksave restore a1b2c3       # or by id
+quicksave restore pre-deploy   # or by the name you gave it
 quicksave restore 3 src/app.py # only pull back one file or directory
 quicksave restore 3 --clean    # exact rewind: also delete files added after the snapshot
 quicksave restore 3 --dry-run  # preview what restore would write or delete, no changes
@@ -51,6 +53,11 @@ under it). By default it is additive: it won't touch new files you created after
 `--clean` for an exact rewind that also deletes files the snapshot didn't have, so the tree matches
 the checkpoint byte for byte. Not sure what a restore will do? Add `--dry-run` to see the files it
 would write (new vs overwritten) and, with `--clean`, the ones it would delete, without touching disk.
+
+`save -n <name>` tags a snapshot so you can roll back to it without hunting for its number or id:
+`quicksave restore pre-deploy`. Anywhere a command takes a snapshot ref (`restore`, `status`, `show`,
+`diff`) the name works too. Names can't be all digits so they never clash with the list numbers, and
+if you reuse a name the most recent one wins.
 
 `status` compares the working tree to a snapshot (the latest one unless you name another) and shows
 what was added, removed or modified since then, so you can see what a checkpoint would pull you back

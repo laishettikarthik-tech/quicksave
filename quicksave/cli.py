@@ -29,12 +29,17 @@ def cmd_init(args):
 
 def cmd_save(args):
     root = _root_or_die()
-    snap_id, n, created = store.save(root, message=args.message or "", force=args.force)
+    snap_id, n, created = store.save(root, message=args.message or "", force=args.force,
+                                     name=args.name or "")
     if not created:
-        console.print(f"[dim]nothing changed since {snap_id}, skipped[/]")
+        if args.name:
+            console.print(f"[dim]nothing changed, named {snap_id}[/] [magenta]{args.name}[/]")
+        else:
+            console.print(f"[dim]nothing changed since {snap_id}, skipped[/]")
         return
+    name = f" [magenta]{args.name}[/]" if args.name else ""
     msg = f" [dim]{args.message}[/]" if args.message else ""
-    console.print(f"saved [cyan]{snap_id}[/] [dim]({n} files)[/]{msg}")
+    console.print(f"saved [cyan]{snap_id}[/]{name} [dim]({n} files)[/]{msg}")
 
 
 def cmd_list(args):
@@ -49,12 +54,14 @@ def cmd_list(args):
     table = Table(box=None, pad_edge=False)
     table.add_column("#", justify="right", style="dim")
     table.add_column("id", style="cyan")
+    table.add_column("name", style="magenta")
     table.add_column("when")
     table.add_column("files", justify="right")
     table.add_column("message")
     for s in snaps:
         when = datetime.fromtimestamp(s["created_at"]).strftime("%Y-%m-%d %H:%M") if s["created_at"] else "-"
-        table.add_row(str(s["seq"]), s["id"], when, str(s["count"]), s["message"] or "[dim]-[/]")
+        table.add_row(str(s["seq"]), s["id"], s.get("name") or "[dim]-[/]", when,
+                      str(s["count"]), s["message"] or "[dim]-[/]")
     console.print(table)
 
 
@@ -192,6 +199,8 @@ def build_parser():
 
     ps = sub.add_parser("save", help="snapshot the working tree")
     ps.add_argument("-m", "--message", default="")
+    ps.add_argument("-n", "--name", default="",
+                    help="label the snapshot so you can restore it by name later")
     ps.add_argument("-f", "--force", action="store_true",
                     help="snapshot even if nothing changed since the last one")
     ps.set_defaults(func=cmd_save)
@@ -202,7 +211,7 @@ def build_parser():
 
     pr = sub.add_parser("restore", help="restore files from a snapshot (default latest)")
     pr.add_argument("ref", nargs="?", default=None,
-                    help="snapshot id or number from 'quicksave list', defaults to latest")
+                    help="snapshot id, number or name from 'quicksave list', defaults to latest")
     pr.add_argument("paths", nargs="*", help="only restore these files or directories")
     pr.add_argument("--clean", action="store_true",
                     help="delete files not in the snapshot (exact rewind)")
