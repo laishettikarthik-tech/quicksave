@@ -77,6 +77,18 @@ blocks the agent.
 }
 ```
 
+Or let quicksave write that config for you:
+
+```
+quicksave hook install            # Claude Code (.claude/settings.json)
+quicksave hook install --tool codex   # Codex (.codex/hooks.json)
+```
+
+It merges into an existing config and won't add the hook twice. Codex uses the same hook shape and
+also passes `tool_input.command` for Bash, so the one `quicksave hook` handler works for both. Any
+other runner with a pre-command hook can call `quicksave hook` the same way as long as it sends the
+command on stdin as `{"tool_input": {"command": "..."}}`.
+
 The hook reads the tool payload on stdin, so each save lands as `pre: <command>` in `quicksave
 list`. Run `quicksave init` once in the project first.
 

@@ -324,6 +324,42 @@ def looks_risky(command):
     return any(r.search(command) for r in _RISKY_RE)
 
 
+# where each runner keeps its hook config. both Claude Code and Codex nest the
+# same {"hooks": {"PreToolUse": [...]}} shape and pass tool_input.command, so
+# one 'quicksave hook' handler serves both.
+HOOK_TARGETS = {
+    "claude": Path(".claude") / "settings.json",
+    "codex": Path(".codex") / "hooks.json",
+}
+HOOK_COMMAND = "quicksave hook"
+
+
+def install_hook(root, tool):
+    rel = HOOK_TARGETS[tool]
+    path = Path(root) / rel
+    data = {}
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            raise QuicksaveError(f"{rel.as_posix()} is not valid json, leaving it alone")
+
+    pre = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
+    for group in pre:
+        if group.get("matcher") == "Bash":
+            handlers = group.setdefault("hooks", [])
+            if any(h.get("command") == HOOK_COMMAND for h in handlers):
+                return path, False
+            handlers.append({"type": "command", "command": HOOK_COMMAND})
+            break
+    else:
+        pre.append({"matcher": "Bash", "hooks": [{"type": "command", "command": HOOK_COMMAND}]})
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return path, True
+
+
 def _path_selected(relpath, paths):
     for p in paths:
         if relpath == p or relpath.startswith(p.rstrip("/") + "/"):

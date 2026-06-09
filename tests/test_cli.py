@@ -67,6 +67,42 @@ def test_hook_noop_outside_project(tmp_path, monkeypatch):
     main(["hook"])  # no quicksave project, must not raise
 
 
+def test_hook_install_claude(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    main(["hook", "install"])
+
+    cfg = json.loads((tmp_path / ".claude" / "settings.json").read_text())
+    group = cfg["hooks"]["PreToolUse"][0]
+    assert group["matcher"] == "Bash"
+    assert group["hooks"][0]["command"] == "quicksave hook"
+
+
+def test_hook_install_codex_and_idempotent(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    main(["hook", "install", "--tool", "codex"])
+    main(["hook", "install", "--tool", "codex"])
+    assert "already wired" in capsys.readouterr().out
+
+    cfg = json.loads((tmp_path / ".codex" / "hooks.json").read_text())
+    pre = cfg["hooks"]["PreToolUse"]
+    assert len(pre) == 1 and len(pre[0]["hooks"]) == 1
+
+
+def test_hook_install_merges_existing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    cfg_dir = tmp_path / ".claude"
+    cfg_dir.mkdir()
+    (cfg_dir / "settings.json").write_text(json.dumps({"model": "opus", "hooks": {}}))
+    main(["hook", "install"])
+
+    cfg = json.loads((cfg_dir / "settings.json").read_text())
+    assert cfg["model"] == "opus"
+    assert cfg["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == "quicksave hook"
+
+
 def test_save_without_init_exits(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     try:

@@ -136,6 +136,16 @@ def cmd_hook(args):
     print(f"quicksave {snap_id} ({n} files) before: {short}", file=sys.stderr)
 
 
+def cmd_hook_install(args):
+    root = _root_or_die()
+    path, changed = store.install_hook(root, args.tool)
+    rel = path.relative_to(root).as_posix()
+    if changed:
+        console.print(f"[green]wired quicksave hook[/] into {rel} ({args.tool})")
+    else:
+        console.print(f"[yellow]already wired[/] in {rel}")
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="quicksave", description="F5 for your filesystem")
     p.add_argument("--version", action="version", version=f"quicksave {__version__}")
@@ -182,6 +192,11 @@ def build_parser():
 
     phook = sub.add_parser("hook", help="PreToolUse hook: auto-save before a risky bash command")
     phook.set_defaults(func=cmd_hook)
+    hsub = phook.add_subparsers(dest="hook_action")
+    hin = hsub.add_parser("install", help="wire the hook into an agent runner's config")
+    hin.add_argument("--tool", choices=sorted(store.HOOK_TARGETS), default="claude",
+                     help="which runner to wire up")
+    hin.set_defaults(func=cmd_hook_install)
 
     return p
 
