@@ -50,6 +50,35 @@ def test_cli_restore_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "note.md").read_text() == "edited"
 
 
+def test_cli_list_json(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.md").write_text("draft")
+    main(["init"])
+    main(["save", "-m", "wip"])
+    capsys.readouterr()
+
+    main(["list", "--json"])
+    snaps = json.loads(capsys.readouterr().out)
+    assert len(snaps) == 1
+    assert snaps[0]["message"] == "wip"
+    assert snaps[0]["count"] == 1
+
+
+def test_cli_status_json(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "a.txt").write_text("v1")
+    main(["init"])
+    main(["save", "-m", "base"])
+    capsys.readouterr()
+
+    (tmp_path / "b.txt").write_text("new")
+    (tmp_path / "a.txt").write_text("v2")
+    main(["status", "--json"])
+    s = json.loads(capsys.readouterr().out)
+    assert s["added"] == ["b.txt"]
+    assert s["modified"] == ["a.txt"]
+
+
 def test_hook_saves_before_risky_command(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data.txt").write_text("keep")

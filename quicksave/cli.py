@@ -40,6 +40,9 @@ def cmd_save(args):
 def cmd_list(args):
     root = _root_or_die()
     snaps = store.list_snapshots(root)
+    if args.json:
+        print(json.dumps(snaps))
+        return
     if not snaps:
         console.print("[dim]no snapshots yet, run 'quicksave save'[/]")
         return
@@ -92,6 +95,9 @@ def cmd_restore_preview(args, root):
 def cmd_status(args):
     root = _root_or_die()
     s = store.status(root, args.ref)
+    if args.json:
+        print(json.dumps(s))
+        return
     label = f"#{s['seq']} {s['id']}"
     if not (s["added"] or s["removed"] or s["modified"]):
         console.print(f"[green]clean[/] [dim]working tree matches snapshot {label}[/]")
@@ -191,6 +197,7 @@ def build_parser():
     ps.set_defaults(func=cmd_save)
 
     pl = sub.add_parser("list", help="list snapshots")
+    pl.add_argument("--json", action="store_true", help="print snapshots as json")
     pl.set_defaults(func=cmd_list)
 
     pr = sub.add_parser("restore", help="restore files from a snapshot (default latest)")
@@ -205,6 +212,7 @@ def build_parser():
 
     pt = sub.add_parser("status", help="show changes since a snapshot (default latest)")
     pt.add_argument("ref", nargs="?", default=None, help="snapshot id or number, defaults to latest")
+    pt.add_argument("--json", action="store_true", help="print the diff as json")
     pt.set_defaults(func=cmd_status)
 
     pd = sub.add_parser("diff", help="show what changed between two snapshots")

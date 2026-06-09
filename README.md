@@ -30,6 +30,7 @@ quicksave restore 3 src/app.py # only pull back one file or directory
 quicksave restore 3 --clean    # exact rewind: also delete files added after the snapshot
 quicksave restore 3 --dry-run  # preview what restore would write or delete, no changes
 quicksave status               # what changed in the tree since the last snapshot
+quicksave list --json          # machine-readable output, same for status --json
 quicksave show 3 src/app.py    # print one file from a snapshot without touching disk
 quicksave diff 2 3             # see what changed between two snapshots
 quicksave gc --keep 10         # drop old snapshots and blobs nothing points at
