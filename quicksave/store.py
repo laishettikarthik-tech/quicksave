@@ -1,3 +1,4 @@
+import fnmatch
 import hashlib
 import json
 import os
@@ -5,6 +6,9 @@ import time
 from pathlib import Path
 
 STORE_DIR = ".quicksave"
+
+# extra ignore patterns are read from these, gitignore-style globs
+IGNORE_FILES = (".quicksaveignore", ".gitignore")
 
 # dirs we never want in a snapshot: vcs metadata, caches, vendored deps, envs
 DEFAULT_IGNORE = {
@@ -44,16 +48,60 @@ def init(path=None):
     return root, True
 
 
-def iter_files(root, ignore=DEFAULT_IGNORE):
+def load_patterns(root):
+    # gitignore-style globs, comments and blanks dropped, no full gitignore semantics
+    pats = []
+    for name in IGNORE_FILES:
+        f = Path(root) / name
+        if not f.is_file():
+            continue
+        for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                pats.append(line.lstrip("!").rstrip("/"))
+    return pats
+
+
+def _matches(relpath, patterns):
+    parts = relpath.split("/")
+    base = parts[-1]
+    for pat in patterns:
+        if not pat:
+            continue
+        if fnmatch.fnmatch(relpath, pat) or fnmatch.fnmatch(base, pat):
+            return True
+        # a bare name like "logs" ignores it at any depth
+        if "/" not in pat and any(fnmatch.fnmatch(seg, pat) for seg in parts):
+            return True
+        # a path like "build/out" ignores everything under it
+        if relpath == pat or relpath.startswith(pat + "/"):
+            return True
+    return False
+
+
+def iter_files(root, ignore=DEFAULT_IGNORE, patterns=None):
     root = Path(root)
+    if patterns is None:
+        patterns = load_patterns(root)
     for dirpath, dirnames, filenames in os.walk(root):
-        # prune ignored dirs so os.walk does not descend into them
-        dirnames[:] = [d for d in dirnames if d not in ignore]
         rel_dir = Path(dirpath).relative_to(root)
+        kept = []
+        for d in dirnames:
+            if d in ignore:
+                continue
+            rel = d if str(rel_dir) == "." else (rel_dir / d).as_posix()
+            if patterns and _matches(rel, patterns):
+                continue
+            kept.append(d)
+        # prune ignored dirs so os.walk does not descend into them
+        dirnames[:] = kept
         for name in filenames:
             if name in ignore:
                 continue
-            yield rel_dir / name if str(rel_dir) != "." else Path(name)
+            rel = Path(name) if str(rel_dir) == "." else rel_dir / name
+            if patterns and _matches(rel.as_posix(), patterns):
+                continue
+            yield rel
 
 
 def _sha256(data):

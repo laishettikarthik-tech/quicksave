@@ -46,6 +46,29 @@ def test_ignore_rules(tmp_path):
     assert n == 1
 
 
+def test_quicksaveignore_patterns(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "keep.txt").write_text("x")
+    (tmp_path / "secret.log").write_text("nope")
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "run.txt").write_text("nope")
+    (tmp_path / ".quicksaveignore").write_text("*.log\nlogs/\n")
+    _, n = store.save(tmp_path)
+    # keep.txt and .quicksaveignore itself remain
+    assert n == 2
+
+
+def test_gitignore_is_respected(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "main.py").write_text("x")
+    (tmp_path / "out.tmp").write_text("nope")
+    (tmp_path / ".gitignore").write_text("# build junk\n*.tmp\n")
+    files = {p.as_posix() for p in store.iter_files(tmp_path)}
+    assert "main.py" in files
+    assert ".gitignore" in files
+    assert "out.tmp" not in files
+
+
 def test_dedup_same_content(tmp_path):
     store.init(tmp_path)
     (tmp_path / "a.txt").write_text("same")

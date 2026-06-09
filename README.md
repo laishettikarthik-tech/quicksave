@@ -58,7 +58,9 @@ to before you run it.
 - Restore just copies the blobs back to their paths.
 
 Caches and vendored deps are skipped by default: `.git`, `node_modules`, `__pycache__`, `venv`,
-`.venv`, `dist`, `build` and friends.
+`.venv`, `dist`, `build` and friends. To skip more, drop a `.quicksaveignore` with gitignore-style
+globs (`*.log`, `logs/`, `tmp/`) in the project root; an existing `.gitignore` is read too. Note
+`.env` is intentionally not ignored by default, the whole point is to keep it safe.
 
 ## Why not just git?
 
