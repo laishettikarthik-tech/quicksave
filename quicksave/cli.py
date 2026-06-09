@@ -145,7 +145,7 @@ def cmd_show(args):
 
 def cmd_gc(args):
     root = _root_or_die()
-    r = store.gc(root, keep=args.keep, dry_run=args.dry_run)
+    r = store.gc(root, keep=args.keep, refs=args.refs, dry_run=args.dry_run)
     tag = " [dim](dry run)[/]" if r["dry_run"] else ""
     if r["pruned"]:
         for name in r["pruned"]:
@@ -235,6 +235,8 @@ def build_parser():
     ph.set_defaults(func=cmd_show)
 
     pg = sub.add_parser("gc", help="drop old snapshots and unreferenced blobs")
+    pg.add_argument("refs", nargs="*",
+                    help="drop these specific snapshots too (id, number or name)")
     pg.add_argument("--keep", type=int, default=None,
                     help="keep only the N most recent snapshots")
     pg.add_argument("--dry-run", action="store_true",

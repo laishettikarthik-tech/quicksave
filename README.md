@@ -36,6 +36,7 @@ quicksave list --json          # machine-readable output, same for status --json
 quicksave show 3 src/app.py    # print one file from a snapshot without touching disk
 quicksave diff 2 3             # see what changed between two snapshots
 quicksave gc --keep 10         # drop old snapshots and blobs nothing points at
+quicksave gc 4 pre-deploy      # drop specific snapshots by number, id or name
 ```
 
 Typical flow with an agent:

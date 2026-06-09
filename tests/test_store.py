@@ -392,6 +392,30 @@ def test_gc_prunes_old_snapshots_and_blobs(tmp_path):
     assert after == 1
 
 
+def test_gc_drops_a_specific_snapshot(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "f.txt").write_text("one")
+    store.save(tmp_path, message="s0")
+    (tmp_path / "f.txt").write_text("two")
+    store.save(tmp_path, message="s1")
+    (tmp_path / "f.txt").write_text("three")
+    store.save(tmp_path, message="s2")
+
+    r = store.gc(tmp_path, refs=["1"])
+    assert len(r["pruned"]) == 1
+    msgs = [s["message"] for s in store.list_snapshots(tmp_path)]
+    assert msgs == ["s0", "s2"]
+    assert r["blobs"] == 1
+
+
+def test_gc_unknown_ref_raises(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "f.txt").write_text("a")
+    store.save(tmp_path)
+    with pytest.raises(store.QuicksaveError):
+        store.gc(tmp_path, refs=["nope"])
+
+
 def test_gc_dry_run_keeps_everything(tmp_path):
     store.init(tmp_path)
     (tmp_path / "f.txt").write_text("a")

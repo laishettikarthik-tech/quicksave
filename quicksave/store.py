@@ -272,13 +272,19 @@ def _iter_blobs(store):
             yield obj, shard.name + obj.name
 
 
-def gc(root, keep=None, dry_run=False):
+def gc(root, keep=None, refs=None, dry_run=False):
     store = store_path(root)
     if not store.is_dir():
         raise QuicksaveError("not a quicksave project, run 'quicksave init' first")
 
     snaps = _snapshot_files(store)
-    drop = snaps[: len(snaps) - keep] if keep is not None and keep < len(snaps) else []
+    drop = list(snaps[: len(snaps) - keep]) if keep is not None and keep < len(snaps) else []
+    for ref in refs or []:
+        f = _find_snapshot(store, ref)
+        if f is None:
+            raise QuicksaveError(f"snapshot '{ref}' not found")
+        if f not in drop:
+            drop.append(f)
     survivors = [f for f in snaps if f not in drop]
 
     pruned = []
