@@ -373,12 +373,18 @@ def _path_selected(relpath, paths):
     return False
 
 
-def restore(root, ref, paths=None, clean=False, ignore=DEFAULT_IGNORE):
+def restore(root, ref=None, paths=None, clean=False, ignore=DEFAULT_IGNORE):
     root = Path(root)
     store = store_path(root)
-    f = _find_snapshot(store, ref)
-    if f is None:
-        raise QuicksaveError(f"snapshot '{ref}' not found")
+    if ref is None:
+        snaps = _snapshot_files(store)
+        if not snaps:
+            raise QuicksaveError("no snapshots yet, run 'quicksave save' first")
+        f = snaps[-1]
+    else:
+        f = _find_snapshot(store, ref)
+        if f is None:
+            raise QuicksaveError(f"snapshot '{ref}' not found")
 
     manifest = json.loads(f.read_text())
     files = manifest["files"]

@@ -58,10 +58,11 @@ def cmd_list(args):
 def cmd_restore(args):
     root = _root_or_die()
     n, removed, manifest = store.restore(root, args.ref, args.paths, clean=args.clean)
-    when = manifest.get("message") or args.ref
+    ref = args.ref or "latest"
+    when = manifest.get("message") or ref
     scope = f" [dim]({', '.join(args.paths)})[/]" if args.paths else ""
     extra = f" [red](removed {removed})[/]" if removed else ""
-    console.print(f"restored [cyan]{n}[/] files from [cyan]{args.ref}[/] [dim]{when}[/]{scope}{extra}")
+    console.print(f"restored [cyan]{n}[/] files from [cyan]{ref}[/] [dim]{when}[/]{scope}{extra}")
 
 
 def cmd_status(args):
@@ -168,8 +169,9 @@ def build_parser():
     pl = sub.add_parser("list", help="list snapshots")
     pl.set_defaults(func=cmd_list)
 
-    pr = sub.add_parser("restore", help="restore files from a snapshot")
-    pr.add_argument("ref", help="snapshot id or number from 'quicksave list'")
+    pr = sub.add_parser("restore", help="restore files from a snapshot (default latest)")
+    pr.add_argument("ref", nargs="?", default=None,
+                    help="snapshot id or number from 'quicksave list', defaults to latest")
     pr.add_argument("paths", nargs="*", help="only restore these files or directories")
     pr.add_argument("--clean", action="store_true",
                     help="delete files not in the snapshot (exact rewind)")

@@ -159,6 +159,24 @@ def test_restore_by_number(tmp_path):
     assert (tmp_path / "f.txt").read_text() == "v1"
 
 
+def test_restore_latest_by_default(tmp_path):
+    store.init(tmp_path)
+    (tmp_path / "f.txt").write_text("v1")
+    store.save(tmp_path)
+    (tmp_path / "f.txt").write_text("v2")
+    store.save(tmp_path)
+
+    (tmp_path / "f.txt").unlink()
+    store.restore(tmp_path)
+    assert (tmp_path / "f.txt").read_text() == "v2"
+
+
+def test_restore_latest_without_snapshots_raises(tmp_path):
+    store.init(tmp_path)
+    with pytest.raises(store.QuicksaveError):
+        store.restore(tmp_path)
+
+
 def test_restore_missing_ref(tmp_path):
     store.init(tmp_path)
     with pytest.raises(store.QuicksaveError):
