@@ -163,6 +163,32 @@ def test_hook_install_merges_existing(tmp_path, monkeypatch):
     assert cfg["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == "quicksave hook"
 
 
+def test_quiet_silences_save_and_list(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.md").write_text("draft")
+    main(["init"])
+    capsys.readouterr()
+
+    main(["save", "-q", "-m", "wip"])
+    main(["-q", "list"])
+    assert capsys.readouterr().out == ""
+
+    # --json still works under --quiet so scripts can read it
+    main(["list", "-q", "--json"])
+    assert json.loads(capsys.readouterr().out)[0]["message"] == "wip"
+
+
+def test_quiet_keeps_error_output(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    try:
+        main(["-q", "save"])
+    except SystemExit as e:
+        assert e.code == 1
+    else:
+        raise AssertionError("expected SystemExit")
+    assert "not a quicksave project" in capsys.readouterr().err
+
+
 def test_save_without_init_exits(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     try:

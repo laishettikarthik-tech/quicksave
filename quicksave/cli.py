@@ -9,6 +9,7 @@ from rich.table import Table
 from . import __version__, store
 
 console = Console()
+err = Console(stderr=True)
 
 
 def _human_size(n):
@@ -21,7 +22,7 @@ def _human_size(n):
 def _root_or_die():
     root = store.find_root()
     if root is None:
-        console.print("[red]not a quicksave project[/], run 'quicksave init' first")
+        err.print("[red]not a quicksave project[/], run 'quicksave init' first")
         raise SystemExit(1)
     return root
 
@@ -198,15 +199,22 @@ def cmd_hook_install(args):
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="quicksave", description="F5 for your filesystem")
+    # --quiet lives on a shared parent so it works both before and after the
+    # subcommand; SUPPRESS keeps an unset copy from clobbering one that was set.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("-q", "--quiet", action="store_true", default=argparse.SUPPRESS,
+                        help="silence normal output, only errors and --json still print")
+
+    p = argparse.ArgumentParser(prog="quicksave", description="F5 for your filesystem",
+                                parents=[common])
     p.add_argument("--version", action="version", version=f"quicksave {__version__}")
     sub = p.add_subparsers(dest="cmd")
 
-    pi = sub.add_parser("init", help="start tracking the current directory")
+    pi = sub.add_parser("init", help="start tracking the current directory", parents=[common])
     pi.add_argument("path", nargs="?", default=None)
     pi.set_defaults(func=cmd_init)
 
-    ps = sub.add_parser("save", help="snapshot the working tree")
+    ps = sub.add_parser("save", help="snapshot the working tree", parents=[common])
     ps.add_argument("-m", "--message", default="")
     ps.add_argument("-n", "--name", default="",
                     help="label the snapshot so you can restore it by name later")
@@ -214,11 +222,11 @@ def build_parser():
                     help="snapshot even if nothing changed since the last one")
     ps.set_defaults(func=cmd_save)
 
-    pl = sub.add_parser("list", help="list snapshots")
+    pl = sub.add_parser("list", help="list snapshots", parents=[common])
     pl.add_argument("--json", action="store_true", help="print snapshots as json")
     pl.set_defaults(func=cmd_list)
 
-    pr = sub.add_parser("restore", help="restore files from a snapshot (default latest)")
+    pr = sub.add_parser("restore", help="restore files from a snapshot (default latest)", parents=[common])
     pr.add_argument("ref", nargs="?", default=None,
                     help="snapshot id, number or name from 'quicksave list', defaults to latest")
     pr.add_argument("paths", nargs="*", help="only restore these files or directories")
@@ -228,22 +236,22 @@ def build_parser():
                     help="show what restore would change without writing anything")
     pr.set_defaults(func=cmd_restore)
 
-    pt = sub.add_parser("status", help="show changes since a snapshot (default latest)")
+    pt = sub.add_parser("status", help="show changes since a snapshot (default latest)", parents=[common])
     pt.add_argument("ref", nargs="?", default=None, help="snapshot id or number, defaults to latest")
     pt.add_argument("--json", action="store_true", help="print the diff as json")
     pt.set_defaults(func=cmd_status)
 
-    pd = sub.add_parser("diff", help="show what changed between two snapshots")
+    pd = sub.add_parser("diff", help="show what changed between two snapshots", parents=[common])
     pd.add_argument("a", help="snapshot id or number")
     pd.add_argument("b", help="snapshot id or number")
     pd.set_defaults(func=cmd_diff)
 
-    ph = sub.add_parser("show", help="print a file's contents from a snapshot to stdout")
+    ph = sub.add_parser("show", help="print a file's contents from a snapshot to stdout", parents=[common])
     ph.add_argument("ref", help="snapshot id or number")
     ph.add_argument("path", help="file to print")
     ph.set_defaults(func=cmd_show)
 
-    pg = sub.add_parser("gc", help="drop old snapshots and unreferenced blobs")
+    pg = sub.add_parser("gc", help="drop old snapshots and unreferenced blobs", parents=[common])
     pg.add_argument("refs", nargs="*",
                     help="drop these specific snapshots too (id, number or name)")
     pg.add_argument("--keep", type=int, default=None,
@@ -252,10 +260,10 @@ def build_parser():
                     help="show what would be removed without deleting")
     pg.set_defaults(func=cmd_gc)
 
-    phook = sub.add_parser("hook", help="PreToolUse hook: auto-save before a risky bash command")
+    phook = sub.add_parser("hook", help="PreToolUse hook: auto-save before a risky bash command", parents=[common])
     phook.set_defaults(func=cmd_hook)
     hsub = phook.add_subparsers(dest="hook_action")
-    hin = hsub.add_parser("install", help="wire the hook into an agent runner's config")
+    hin = hsub.add_parser("install", help="wire the hook into an agent runner's config", parents=[common])
     hin.add_argument("--tool", choices=sorted(store.HOOK_TARGETS), default="claude",
                      help="which runner to wire up")
     hin.set_defaults(func=cmd_hook_install)
@@ -266,13 +274,15 @@ def build_parser():
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
+    if getattr(args, "quiet", False):
+        console.quiet = True
     if not getattr(args, "func", None):
         parser.print_help()
         return
     try:
         args.func(args)
     except store.QuicksaveError as e:
-        console.print(f"[red]error:[/] {e}")
+        err.print(f"[red]error:[/] {e}")
         raise SystemExit(1)
 
 
