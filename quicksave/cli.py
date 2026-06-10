@@ -117,6 +117,22 @@ def cmd_restore_preview(args, root):
     console.print(f"[dim]{summary} - dry run, nothing touched[/]")
 
 
+def cmd_undo(args):
+    root = _root_or_die()
+    backup = store.last_restore_backup(root)
+    if backup is None:
+        err.print("[yellow]nothing to undo[/], no restore backup found")
+        raise SystemExit(1)
+    # back up the current tree first, so undo is itself reversible with a restore
+    if not args.no_backup:
+        bid, _, made = store.save(root, message="before undo")
+        if made:
+            console.print(f"[dim]backed up current tree as {bid}[/]")
+    n, removed, _ = store.restore(root, backup, clean=args.clean)
+    extra = f" [red](removed {removed})[/]" if removed else ""
+    console.print(f"undid last restore, [cyan]{n}[/] files back to [cyan]{backup}[/]{extra}")
+
+
 def cmd_status(args):
     root = _root_or_die()
     s = store.status(root, args.ref)
@@ -245,6 +261,13 @@ def build_parser():
     pr.add_argument("--no-backup", action="store_true",
                     help="don't snapshot the current tree before restoring")
     pr.set_defaults(func=cmd_restore)
+
+    pu = sub.add_parser("undo", help="revert the last restore, back to the pre-restore tree", parents=[common])
+    pu.add_argument("--clean", action="store_true",
+                    help="also delete files the restore added (exact rewind)")
+    pu.add_argument("--no-backup", action="store_true",
+                    help="don't snapshot the current tree before undoing")
+    pu.set_defaults(func=cmd_undo)
 
     pt = sub.add_parser("status", help="show changes since a snapshot (default latest)", parents=[common])
     pt.add_argument("ref", nargs="?", default=None, help="snapshot id or number, defaults to latest")

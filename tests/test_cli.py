@@ -53,6 +53,51 @@ def test_restore_backs_up_current_tree(tmp_path, monkeypatch, capsys):
     assert (tmp_path / "note.md").read_text() == "v2"
 
 
+def test_undo_reverts_last_restore(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.md").write_text("v1")
+    main(["init"])
+    main(["save", "-m", "base"])
+
+    (tmp_path / "note.md").write_text("v2")
+    main(["restore", "0"])
+    assert (tmp_path / "note.md").read_text() == "v1"
+
+    capsys.readouterr()
+    main(["undo"])
+    out = capsys.readouterr().out
+    assert "undid last restore" in out
+    assert (tmp_path / "note.md").read_text() == "v2"
+
+
+def test_undo_clean_drops_files_the_restore_added(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "a.txt").write_text("keep")
+    main(["init"])
+    main(["save", "-m", "rich"])
+
+    (tmp_path / "a.txt").unlink()
+    main(["restore", "0"])
+    assert (tmp_path / "a.txt").exists()
+
+    main(["undo", "--clean"])
+    assert not (tmp_path / "a.txt").exists()
+
+
+def test_undo_without_restore_errors(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.md").write_text("v1")
+    main(["init"])
+    main(["save", "-m", "base"])
+
+    try:
+        main(["undo"])
+    except SystemExit as e:
+        assert e.code == 1
+    else:
+        raise AssertionError("undo should exit non-zero with no restore to undo")
+
+
 def test_restore_no_backup_skips_snapshot(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "note.md").write_text("v1")

@@ -411,6 +411,19 @@ def resolve_id(root, ref):
     return f.stem.partition("-")[2]
 
 
+RESTORE_BACKUP_PREFIX = "before restore of "
+
+
+def last_restore_backup(root):
+    # the most recent snapshot 'restore' took of the live tree before overwriting
+    # it. undo rewinds to this, so a wrong restore can be reverted by name.
+    store = store_path(root)
+    for f in reversed(_snapshot_files(store)):
+        if json.loads(f.read_text()).get("message", "").startswith(RESTORE_BACKUP_PREFIX):
+            return f.stem.partition("-")[2]
+    return None
+
+
 def _resolve_snapshot(store, ref):
     if ref is None:
         snaps = _snapshot_files(store)
