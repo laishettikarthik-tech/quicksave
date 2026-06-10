@@ -80,7 +80,15 @@ def cmd_restore(args):
     if args.dry_run:
         cmd_restore_preview(args, root)
         return
-    n, removed, manifest = store.restore(root, args.ref, args.paths, clean=args.clean)
+    # a restore overwrites the live tree, so snapshot it first - that way a wrong
+    # restore is itself reversible. resolve the target before the backup so it
+    # doesn't become the new "latest" and shadow a bare 'restore' ref.
+    target = store.resolve_id(root, args.ref)
+    if not args.no_backup:
+        bid, _, made = store.save(root, message=f"before restore of {args.ref or 'latest'}")
+        if made:
+            console.print(f"[dim]backed up current tree as {bid}[/]")
+    n, removed, manifest = store.restore(root, target, args.paths, clean=args.clean)
     ref = args.ref or "latest"
     when = manifest.get("message") or ref
     scope = f" [dim]({', '.join(args.paths)})[/]" if args.paths else ""
@@ -234,6 +242,8 @@ def build_parser():
                     help="delete files not in the snapshot (exact rewind)")
     pr.add_argument("--dry-run", action="store_true",
                     help="show what restore would change without writing anything")
+    pr.add_argument("--no-backup", action="store_true",
+                    help="don't snapshot the current tree before restoring")
     pr.set_defaults(func=cmd_restore)
 
     pt = sub.add_parser("status", help="show changes since a snapshot (default latest)", parents=[common])

@@ -31,6 +31,7 @@ quicksave restore pre-deploy   # or by the name you gave it
 quicksave restore 3 src/app.py # only pull back one file or directory
 quicksave restore 3 --clean    # exact rewind: also delete files added after the snapshot
 quicksave restore 3 --dry-run  # preview what restore would write or delete, no changes
+quicksave restore 3 --no-backup # skip the safety snapshot of the current tree
 quicksave status               # what changed in the tree since the last snapshot
 quicksave list --json          # machine-readable output, same for status --json
 quicksave show 3 src/app.py    # print one file from a snapshot without touching disk
@@ -58,6 +59,10 @@ under it). By default it is additive: it won't touch new files you created after
 `--clean` for an exact rewind that also deletes files the snapshot didn't have, so the tree matches
 the checkpoint byte for byte. Not sure what a restore will do? Add `--dry-run` to see the files it
 would write (new vs overwritten) and, with `--clean`, the ones it would delete, without touching disk.
+
+Restore snapshots the current tree first, so a restore you didn't mean is itself reversible: pick the
+wrong checkpoint and `quicksave restore` (the latest snapshot is now that backup) puts you back. The
+backup is skipped when nothing changed since the last snapshot, and `--no-backup` turns it off.
 
 `save -n <name>` tags a snapshot so you can roll back to it without hunting for its number or id:
 `quicksave restore pre-deploy`. Anywhere a command takes a snapshot ref (`restore`, `status`, `show`,

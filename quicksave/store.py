@@ -406,6 +406,11 @@ def _path_selected(relpath, paths):
     return False
 
 
+def resolve_id(root, ref):
+    f = _resolve_snapshot(store_path(root), ref)
+    return f.stem.partition("-")[2]
+
+
 def _resolve_snapshot(store, ref):
     if ref is None:
         snaps = _snapshot_files(store)

@@ -29,10 +29,41 @@ def test_cli_status_and_clean(tmp_path, monkeypatch, capsys):
     main(["status"])
     assert "junk.txt" in capsys.readouterr().out
 
-    main(["restore", "0", "--clean"])
+    main(["restore", "0", "--clean", "--no-backup"])
     assert not (tmp_path / "junk.txt").exists()
     main(["status"])
     assert "clean" in capsys.readouterr().out
+
+
+def test_restore_backs_up_current_tree(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.md").write_text("v1")
+    main(["init"])
+    main(["save", "-m", "base"])
+    capsys.readouterr()
+
+    (tmp_path / "note.md").write_text("v2")
+    main(["restore", "0"])
+    assert (tmp_path / "note.md").read_text() == "v1"
+
+    # the pre-restore "v2" tree is now its own snapshot, so a wrong restore is undoable
+    snaps = list((tmp_path / ".quicksave" / "snapshots").glob("*.json"))
+    assert len(snaps) == 2
+    main(["restore"])
+    assert (tmp_path / "note.md").read_text() == "v2"
+
+
+def test_restore_no_backup_skips_snapshot(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "note.md").write_text("v1")
+    main(["init"])
+    main(["save", "-m", "base"])
+    capsys.readouterr()
+
+    (tmp_path / "note.md").write_text("v2")
+    main(["restore", "0", "--no-backup"])
+    snaps = list((tmp_path / ".quicksave" / "snapshots").glob("*.json"))
+    assert len(snaps) == 1
 
 
 def test_cli_restore_dry_run_changes_nothing(tmp_path, monkeypatch, capsys):
